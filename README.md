@@ -31,6 +31,19 @@ make -C driver
 make -C overlay
 ```
 
+To build and install the module and overlay for the running kernel:
+
+```bash
+sudo ./scripts/install.sh
+```
+
+Reboot after installation. To remove the installed files and boot
+configuration:
+
+```bash
+sudo ./scripts/uninstall.sh
+```
+
 Install the Device Tree overlay and enable it for the next boot:
 
 ```bash

@@ -1,0 +1,26 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2711";
+
+	fragment@0 {
+		target-path = "/soc";
+
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			bsc_spi_slave: spi-slave@7e214000 {
+				compatible = "eccb,bcm2711-bsc-spi-slave";
+				reg = <0x7e214000 0x1000>;
+
+				/* BCM2711 DREQ 8 is TX; DREQ 9 is RX. */
+				dmas = <&dma 8>, <&dma 9>;
+				dma-names = "tx", "rx";
+
+				status = "okay";
+			};
+		};
+	};
+};

@@ -66,6 +66,8 @@ static dma_addr_t bsc_dr_dma_addr;
 static DEFINE_MUTEX(tx_dma_mutex);
 static struct task_struct *monitor_task;
 static struct dentry *debugfs_dir;
+static atomic_t open_count = ATOMIC_INIT(0);
+static bool removing;
 static u8 rx_ring[RX_RING_SIZE];
 static unsigned int rx_head;
 static unsigned int rx_tail;
@@ -95,6 +97,7 @@ static DEFINE_SPINLOCK(rx_lock);
 static DEFINE_SPINLOCK(tx_lock);
 static DECLARE_WAIT_QUEUE_HEAD(rx_wait);
 static DECLARE_WAIT_QUEUE_HEAD(tx_wait);
+static DECLARE_WAIT_QUEUE_HEAD(remove_wait);
 
 static void tx_path_clear(void);
 
@@ -486,6 +489,8 @@ static ssize_t cm4_spi_slave_read(
 
 	if (count == 0)
 	return 0;
+	if (READ_ONCE(removing))
+	return -ENODEV;
 
 	spin_lock_irqsave(&rx_lock, flags);
 	rx_read_calls++;
@@ -498,8 +503,11 @@ static ssize_t cm4_spi_slave_read(
 	spin_lock_irqsave(&rx_lock, flags);
 	rx_empty_waits++;
 	spin_unlock_irqrestore(&rx_lock, flags);
-	if (wait_event_interruptible(rx_wait, READ_ONCE(rx_count) > 0))
+	if (wait_event_interruptible(rx_wait,
+		READ_ONCE(rx_count) > 0 || READ_ONCE(removing)))
 		return -ERESTARTSYS;
+	if (READ_ONCE(removing))
+		return -ENODEV;
 	}
 
 	do {
@@ -538,6 +546,8 @@ static ssize_t cm4_spi_slave_write(
 	(void)ppos;
 	if (count == 0)
 	return 0;
+	if (READ_ONCE(removing))
+	return -ENODEV;
 	if (check_mul_overflow(count, sizeof(*new_dma_buf), &new_dma_size))
 	return -EOVERFLOW;
 
@@ -569,6 +579,12 @@ static ssize_t cm4_spi_slave_write(
 		ret = mutex_lock_interruptible(&tx_dma_mutex);
 		if (ret)
 			goto free_new_buffer;
+	}
+	if (READ_ONCE(removing)) {
+		ret = -ENODEV;
+		mutex_unlock(&tx_dma_mutex);
+		wake_up_interruptible(&tx_wait);
+		goto free_new_buffer;
 	}
 
 	/* A new write replaces the previous published response. */
@@ -650,11 +666,30 @@ static int cm4_spi_slave_open(struct inode *inode, struct file *file)
 	unsigned long flags;
 
 	(void)inode;
+	if (READ_ONCE(removing))
+		return -ENODEV;
+
+	atomic_inc(&open_count);
+	smp_mb__after_atomic();
+	if (READ_ONCE(removing)) {
+		if (atomic_dec_and_test(&open_count))
+			wake_up(&remove_wait);
+		return -ENODEV;
+	}
 
 	if (file->f_mode & FMODE_WRITE) {
+	mutex_lock(&tx_dma_mutex);
+	if (READ_ONCE(removing)) {
+		mutex_unlock(&tx_dma_mutex);
+		if (atomic_dec_and_test(&open_count))
+			wake_up(&remove_wait);
+		return -ENODEV;
+	}
 	spin_lock_irqsave(&tx_lock, flags);
 	tx_writers++;
 	spin_unlock_irqrestore(&tx_lock, flags);
+	mutex_unlock(&tx_dma_mutex);
+	wake_up_interruptible(&tx_wait);
 	}
 
 	return 0;
@@ -668,6 +703,7 @@ static int cm4_spi_slave_release(struct inode *inode, struct file *file)
 	(void)inode;
 
 	if (file->f_mode & FMODE_WRITE) {
+	mutex_lock(&tx_dma_mutex);
 	spin_lock_irqsave(&tx_lock, flags);
 	if (tx_writers > 0)
 		tx_writers--;
@@ -675,14 +711,16 @@ static int cm4_spi_slave_release(struct inode *inode, struct file *file)
 	spin_unlock_irqrestore(&tx_lock, flags);
 
 	if (clear_tx) {
-	mutex_lock(&tx_dma_mutex);
 	dmaengine_terminate_sync(tx_dma);
 	tx_dma_buffer_free();
 	tx_path_clear();
+	}
 	mutex_unlock(&tx_dma_mutex);
 	wake_up_interruptible(&tx_wait);
 	}
-	}
+
+	if (atomic_dec_and_test(&open_count))
+	wake_up(&remove_wait);
 
 	return 0;
 }
@@ -694,6 +732,8 @@ static __poll_t cm4_spi_slave_poll(struct file *file, poll_table *wait)
 
 	poll_wait(file, &rx_wait, wait);
 	poll_wait(file, &tx_wait, wait);
+	if (READ_ONCE(removing))
+	return POLLERR | POLLHUP;
 
 	spin_lock_irqsave(&rx_lock, flags);
 	if (rx_count > 0)
@@ -807,6 +847,8 @@ static int bcm_spi_probe(struct platform_device *pdev)
 	rx_tail = 0;
 	rx_count = 0;
 	tx_writers = 0;
+	atomic_set(&open_count, 0);
+	WRITE_ONCE(removing, false);
 	cm4_spi_reset_stats();
 
 	writel(0x00000000, bsc + BSC_CR);
@@ -856,7 +898,11 @@ static int bcm_spi_probe(struct platform_device *pdev)
 	dev_err(&pdev->dev, "failed to start monitor thread: %d\n", ret);
 	debugfs_remove_recursive(debugfs_dir);
 	debugfs_dir = NULL;
+	WRITE_ONCE(removing, true);
 	misc_deregister(&cm4_spi_slave_miscdev);
+	wake_up_interruptible(&rx_wait);
+	wake_up_interruptible(&tx_wait);
+	wait_event(remove_wait, atomic_read(&open_count) == 0);
 	goto err_release_dma;
 	}
 
@@ -864,6 +910,12 @@ static int bcm_spi_probe(struct platform_device *pdev)
 	return 0;
 
 err_release_dma:
+	if (bsc)
+	writel(0x00000000, bsc + BSC_DMACR);
+	if (bsc)
+	writel(0x00000000, bsc + BSC_CR);
+	if (tx_dma)
+	dmaengine_terminate_sync(tx_dma);
 	tx_dma_buffer_free();
 	dma_release_channel(tx_dma);
 	tx_dma = NULL;
@@ -876,25 +928,30 @@ static void bcm_spi_remove(struct platform_device *pdev)
 {
 	(void)pdev;
 
+	WRITE_ONCE(removing, true);
+	debugfs_remove_recursive(debugfs_dir);
+	debugfs_dir = NULL;
+	misc_deregister(&cm4_spi_slave_miscdev);
+	wake_up_interruptible(&rx_wait);
+	wake_up_interruptible(&tx_wait);
+	wait_event(remove_wait, atomic_read(&open_count) == 0);
+
 	if (monitor_task)
 	kthread_stop(monitor_task);
 	monitor_task = NULL;
 
-	debugfs_remove_recursive(debugfs_dir);
-	debugfs_dir = NULL;
-	misc_deregister(&cm4_spi_slave_miscdev);
-
-	if (bsc)
-	writel(0x00000000, bsc + BSC_DMACR);
-	if (bsc)
-	writel(0x00000000, bsc + BSC_CR);
-
+	mutex_lock(&tx_dma_mutex);
 	if (tx_dma) {
 	dmaengine_terminate_sync(tx_dma);
 	tx_dma_buffer_free();
+	if (bsc)
+		writel(0x00000000, bsc + BSC_DMACR);
+	if (bsc)
+		writel(0x00000000, bsc + BSC_CR);
 	dma_release_channel(tx_dma);
 	tx_dma = NULL;
 	}
+	mutex_unlock(&tx_dma_mutex);
 	bsc_dev = NULL;
 	bsc = NULL;
 

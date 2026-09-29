@@ -153,4 +153,6 @@ sudo reboot
 ```
 
 The uninstall script removes the module, overlay, automatic module-loading
-configuration, and the overlay entry from the boot configuration.
+configuration, and the overlay entry from the boot configuration. It refuses
+to continue while a process has `/dev/cm4_spi_slave` open. Stop the listed
+application and run the script again.

@@ -7,17 +7,17 @@ tests have passed on the release candidate.
 ## 1. Driver lifecycle and concurrency
 
 - [ ] Fix safe device removal while files are open.
-- [ ] Reject new operations after device removal begins.
-- [ ] Stop the RX monitor before disabling or releasing hardware resources.
-- [ ] Terminate active DMA before freeing its buffer or channel.
-- [ ] Ensure DMA buffers and MMIO resources are released exactly once.
-- [ ] Make every probe failure path disable BSC DMA and the BSC peripheral.
-- [ ] Unregister every successfully created interface during probe rollback.
-- [ ] Fix the race between the last writer closing and a new writer opening.
-- [ ] Serialize response replacement without erasing a newer writer's data.
-- [ ] Make nonblocking writes return `EAGAIN` when TX setup is busy.
-- [ ] Make `poll()` writable state match whether a write can start immediately.
-- [ ] Wake writable poll waiters whenever TX setup becomes available.
+- [x] Reject new operations after device removal begins.
+- [x] Stop the RX monitor before disabling or releasing hardware resources.
+- [x] Terminate active DMA before freeing its buffer or channel.
+- [x] Ensure DMA buffers and MMIO resources are released exactly once.
+- [x] Make every probe failure path disable BSC DMA and the BSC peripheral.
+- [x] Unregister every successfully created interface during probe rollback.
+- [x] Fix the race between the last writer closing and a new writer opening.
+- [x] Serialize response replacement without erasing a newer writer's data.
+- [x] Make nonblocking writes return `EAGAIN` when TX setup is busy.
+- [x] Make `poll()` writable state match whether a write can start immediately.
+- [x] Wake writable poll waiters whenever TX setup becomes available.
 - [ ] Test repeated module load and unload.
 - [ ] Test repeated Device Tree bind and unbind.
 - [ ] Test forced probe failures at each resource-acquisition stage.
@@ -44,6 +44,10 @@ tests have passed on the release candidate.
 - [ ] Document blocking and nonblocking behavior and all expected errors.
 - [ ] Document response replacement and DMA completion semantics.
 - [ ] Document RX overflow behavior and the SPI direction bytes.
+- [ ] Decide whether to keep `/dev/cm4_spi_slave` for compatibility or rename
+  it to `/dev/bcm2711_spi_slave` before freezing the ABI.
+- [ ] If the device is renamed, provide and test a compatibility path for
+  existing ROS 2 and Python applications.
 - [x] Remove the obsolete fixed-size TX software ring.
 - [x] Allocate the TX DMA buffer according to each write size.
 - [ ] Define practical DMA allocation and descriptor failure behavior.
@@ -75,6 +79,7 @@ tests have passed on the release candidate.
 - [x] Validate module version and kernel vermagic before installation.
 - [x] Stage module and overlay replacements and roll back failed installs.
 - [x] Record installed version, kernel, and artifact checksums.
+- [x] Refuse scripted uninstall while `/dev/cm4_spi_slave` is open.
 - [ ] Add DKMS only after the driver lifecycle and ABI are stable.
 - [ ] Test automatic rebuilds across at least two kernel upgrades.
 - [ ] Add and test a udev rule for non-root access.
@@ -88,4 +93,3 @@ tests have passed on the release candidate.
 - [ ] Confirm the repository contains no generated files or credentials.
 - [ ] Commit the release candidate and create an annotated `v0.1.0` tag.
 - [ ] Publish source archives and release notes.
-

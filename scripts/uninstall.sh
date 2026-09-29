@@ -5,13 +5,23 @@ set -euo pipefail
 MODULE_NAME="bcm2711_spi_slave"
 OVERLAY_NAME="bcm2711-bsc-spi-slave"
 KERNEL_RELEASE="$(uname -r)"
-MODULE_FILE="/lib/modules/${KERNEL_RELEASE}/extra/${MODULE_NAME}.ko"
 MODULE_LOAD_FILE="/etc/modules-load.d/${MODULE_NAME}.conf"
+STATE_DIR="/var/lib/bcm2711-spi-slave"
+STATE_FILE="${STATE_DIR}/install.conf"
 
 if [[ ${EUID} -ne 0 ]]; then
 	echo "Run this uninstaller as root: sudo $0" >&2
 	exit 1
 fi
+
+INSTALLED_KERNEL="${KERNEL_RELEASE}"
+if [[ -r ${STATE_FILE} ]]; then
+	RECORDED_KERNEL="$(sed -n 's/^KERNEL_RELEASE=//p' "${STATE_FILE}")"
+	if [[ ${RECORDED_KERNEL} =~ ^[A-Za-z0-9._+-]+$ ]]; then
+		INSTALLED_KERNEL="${RECORDED_KERNEL}"
+	fi
+fi
+MODULE_FILE="/lib/modules/${INSTALLED_KERNEL}/extra/${MODULE_NAME}.ko"
 
 if [[ -f /boot/firmware/config.txt ]]; then
 	BOOT_CONFIG=/boot/firmware/config.txt
@@ -36,12 +46,15 @@ echo "Removing installed files..."
 rm -f -- "${MODULE_FILE}"
 rm -f -- "${MODULE_LOAD_FILE}"
 rm -f -- "${OVERLAY_DIR}/${OVERLAY_NAME}.dtbo"
+rm -f -- "${STATE_FILE}"
+rmdir --ignore-fail-on-non-empty "${STATE_DIR}" 2>/dev/null || true
 
 sed -i \
 	"/^[[:space:]]*dtoverlay=${OVERLAY_NAME}[[:space:]]*\(#.*\)\?$/d" \
 	"${BOOT_CONFIG}"
 
-depmod -a "${KERNEL_RELEASE}"
+if [[ -d /lib/modules/${INSTALLED_KERNEL} ]]; then
+	depmod -a "${INSTALLED_KERNEL}"
+fi
 
 echo "Uninstallation complete. Reboot to deactivate the overlay."
-

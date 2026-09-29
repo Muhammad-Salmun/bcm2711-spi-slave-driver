@@ -12,6 +12,7 @@
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
+#include <linux/overflow.h>
 #include <linux/platform_device.h>
 #include <linux/poll.h>
 #include <linux/seq_file.h>
@@ -39,7 +40,6 @@
 #define FR_TXFF (1 << 2)
 #define FR_TXFE (1 << 4)
 #define RX_RING_SIZE 65536
-#define TX_RING_SIZE (65539)
 
 static unsigned int poll_interval_us = 20;
 module_param(poll_interval_us, uint, 0644);
@@ -57,22 +57,19 @@ MODULE_PARM_DESC(dma_bus_address,
 		 "override BSC_DR DMA bus address (diagnostic only; zero uses DT)");
 
 static void __iomem *bsc;
+static struct device *bsc_dev;
 static struct dma_chan *tx_dma;
 static u32 *tx_dma_buf;
 static dma_addr_t tx_dma_handle;
+static size_t tx_dma_size;
 static dma_addr_t bsc_dr_dma_addr;
 static DEFINE_MUTEX(tx_dma_mutex);
 static struct task_struct *monitor_task;
 static struct dentry *debugfs_dir;
 static u8 rx_ring[RX_RING_SIZE];
-static u8 tx_ring[TX_RING_SIZE];
 static unsigned int rx_head;
 static unsigned int rx_tail;
 static unsigned int rx_count;
-static unsigned int tx_head;
-static unsigned int tx_tail;
-static unsigned int tx_count;
-static unsigned int tx_peak;
 static unsigned int tx_writers;
 static unsigned long long rx_total;
 static unsigned long long rx_overruns;
@@ -92,34 +89,13 @@ static unsigned long long tx_write_requested;
 static unsigned long long tx_write_completed;
 static unsigned long long tx_write_short;
 static unsigned long long tx_write_errors;
-static unsigned long long tx_ring_queued;
-static unsigned long long tx_ring_dequeued;
-static unsigned long long tx_ring_full_events;
-static unsigned long long tx_ring_full_waits;
-static unsigned long long tx_fifo_fill_calls;
-static unsigned long long tx_fifo_fill_aggressive_calls;
-static unsigned long long tx_fifo_bytes_loaded;
-static unsigned long long tx_fifo_empty_observed;
-static unsigned long long tx_fifo_full_observed;
-static unsigned long long tx_refill_on_write_calls;
-static unsigned long long tx_refill_on_write_bytes;
-static unsigned long long tx_fifo_write_blocked_by_full;
-static u32 tx_fifo_fr_at_block;
 static u32 tx_fifo_last_fr;
-static unsigned long long tx_forced_bytes_loaded;
-static u32 tx_forced_last_fr_before;
-static u32 tx_forced_last_fr_after;
-static unsigned long long tx_starvation_events;
-static unsigned long long tx_no_writer_fill_calls;
 static unsigned long long tx_clear_events;
-static unsigned long last_tx_debug;
-static bool tx_starved_latched;
 static DEFINE_SPINLOCK(rx_lock);
 static DEFINE_SPINLOCK(tx_lock);
 static DECLARE_WAIT_QUEUE_HEAD(rx_wait);
 static DECLARE_WAIT_QUEUE_HEAD(tx_wait);
 
-static unsigned int cm4_bsc_fill_tx_fifo_aggressive(void);
 static void tx_path_clear(void);
 
 static void cm4_bsc_discard_rx_fifo(void)
@@ -170,33 +146,13 @@ static void cm4_spi_reset_stats(void)
 	spin_unlock_irqrestore(&rx_lock, flags);
 
 	spin_lock_irqsave(&tx_lock, flags);
-	tx_peak = tx_count;
 	tx_write_calls = 0;
 	tx_write_requested = 0;
 	tx_write_completed = 0;
 	tx_write_short = 0;
 	tx_write_errors = 0;
-	tx_ring_queued = 0;
-	tx_ring_dequeued = 0;
-	tx_ring_full_events = 0;
-	tx_ring_full_waits = 0;
-	tx_fifo_fill_calls = 0;
-	tx_fifo_fill_aggressive_calls = 0;
-	tx_fifo_bytes_loaded = 0;
-	tx_fifo_empty_observed = 0;
-	tx_fifo_full_observed = 0;
-	tx_refill_on_write_calls = 0;
-	tx_refill_on_write_bytes = 0;
-	tx_fifo_write_blocked_by_full = 0;
-	tx_fifo_fr_at_block = 0;
 	tx_fifo_last_fr = 0;
-	tx_forced_bytes_loaded = 0;
-	tx_forced_last_fr_before = 0;
-	tx_forced_last_fr_after = 0;
-	tx_starvation_events = 0;
-	tx_no_writer_fill_calls = 0;
 	tx_clear_events = 0;
-	tx_starved_latched = false;
 	spin_unlock_irqrestore(&tx_lock, flags);
 }
 
@@ -220,36 +176,15 @@ static int cm4_spi_stats_show(struct seq_file *m, void *v)
 	unsigned long long rx_debug_prints_snapshot;
 	u32 rx_last_fr_snapshot;
 	u32 rx_last_dr_snapshot;
-	unsigned int tx_head_snapshot;
-	unsigned int tx_tail_snapshot;
-	unsigned int tx_count_snapshot;
-	unsigned int tx_peak_snapshot;
 	unsigned int tx_writers_snapshot;
 	unsigned long long tx_write_calls_snapshot;
 	unsigned long long tx_write_requested_snapshot;
 	unsigned long long tx_write_completed_snapshot;
 	unsigned long long tx_write_short_snapshot;
 	unsigned long long tx_write_errors_snapshot;
-	unsigned long long tx_ring_queued_snapshot;
-	unsigned long long tx_ring_dequeued_snapshot;
-	unsigned long long tx_ring_full_events_snapshot;
-	unsigned long long tx_ring_full_waits_snapshot;
-	unsigned long long tx_fifo_fill_calls_snapshot;
-	unsigned long long tx_fifo_fill_aggressive_calls_snapshot;
-	unsigned long long tx_fifo_bytes_loaded_snapshot;
-	unsigned long long tx_fifo_empty_observed_snapshot;
-	unsigned long long tx_fifo_full_observed_snapshot;
-	unsigned long long tx_refill_on_write_calls_snapshot;
-	unsigned long long tx_refill_on_write_bytes_snapshot;
-	unsigned long long tx_fifo_write_blocked_by_full_snapshot;
-	u32 tx_fifo_fr_at_block_snapshot;
 	u32 tx_fifo_last_fr_snapshot;
-	unsigned long long tx_forced_bytes_loaded_snapshot;
-	u32 tx_forced_last_fr_before_snapshot;
-	u32 tx_forced_last_fr_after_snapshot;
-	unsigned long long tx_starvation_events_snapshot;
-	unsigned long long tx_no_writer_fill_calls_snapshot;
 	unsigned long long tx_clear_events_snapshot;
+	size_t tx_dma_size_snapshot;
 
 	(void)v;
 
@@ -275,37 +210,16 @@ static int cm4_spi_stats_show(struct seq_file *m, void *v)
 	spin_unlock_irqrestore(&rx_lock, flags);
 
 	spin_lock_irqsave(&tx_lock, flags);
-	tx_head_snapshot = tx_head;
-	tx_tail_snapshot = tx_tail;
-	tx_count_snapshot = tx_count;
-	tx_peak_snapshot = tx_peak;
 	tx_writers_snapshot = tx_writers;
 	tx_write_calls_snapshot = tx_write_calls;
 	tx_write_requested_snapshot = tx_write_requested;
 	tx_write_completed_snapshot = tx_write_completed;
 	tx_write_short_snapshot = tx_write_short;
 	tx_write_errors_snapshot = tx_write_errors;
-	tx_ring_queued_snapshot = tx_ring_queued;
-	tx_ring_dequeued_snapshot = tx_ring_dequeued;
-	tx_ring_full_events_snapshot = tx_ring_full_events;
-	tx_ring_full_waits_snapshot = tx_ring_full_waits;
-	tx_fifo_fill_calls_snapshot = tx_fifo_fill_calls;
-	tx_fifo_fill_aggressive_calls_snapshot = tx_fifo_fill_aggressive_calls;
-	tx_fifo_bytes_loaded_snapshot = tx_fifo_bytes_loaded;
-	tx_fifo_empty_observed_snapshot = tx_fifo_empty_observed;
-	tx_fifo_full_observed_snapshot = tx_fifo_full_observed;
-	tx_refill_on_write_calls_snapshot = tx_refill_on_write_calls;
-	tx_refill_on_write_bytes_snapshot = tx_refill_on_write_bytes;
-	tx_fifo_write_blocked_by_full_snapshot = tx_fifo_write_blocked_by_full;
-	tx_fifo_fr_at_block_snapshot = tx_fifo_fr_at_block;
 	tx_fifo_last_fr_snapshot = tx_fifo_last_fr;
-	tx_forced_bytes_loaded_snapshot = tx_forced_bytes_loaded;
-	tx_forced_last_fr_before_snapshot = tx_forced_last_fr_before;
-	tx_forced_last_fr_after_snapshot = tx_forced_last_fr_after;
-	tx_starvation_events_snapshot = tx_starvation_events;
-	tx_no_writer_fill_calls_snapshot = tx_no_writer_fill_calls;
 	tx_clear_events_snapshot = tx_clear_events;
 	spin_unlock_irqrestore(&tx_lock, flags);
+	tx_dma_size_snapshot = READ_ONCE(tx_dma_size);
 
 	seq_printf(m, "fr=0x%08X\n", fr);
 	seq_printf(m, "rx_ring_size=%u\n", RX_RING_SIZE);
@@ -330,50 +244,15 @@ static int cm4_spi_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "rx_debug_prints=%llu\n", rx_debug_prints_snapshot);
 	seq_printf(m, "rx_last_fr=0x%08X\n", rx_last_fr_snapshot);
 	seq_printf(m, "rx_last_dr=0x%08X\n", rx_last_dr_snapshot);
-	seq_printf(m, "tx_ring_size=%u\n", TX_RING_SIZE);
-	seq_printf(m, "tx_head=%u\n", tx_head_snapshot);
-	seq_printf(m, "tx_tail=%u\n", tx_tail_snapshot);
-	seq_printf(m, "tx_count=%u\n", tx_count_snapshot);
-	seq_printf(m, "tx_peak=%u\n", tx_peak_snapshot);
 	seq_printf(m, "tx_writers=%u\n", tx_writers_snapshot);
 	seq_printf(m, "tx_write_calls=%llu\n", tx_write_calls_snapshot);
 	seq_printf(m, "tx_write_requested=%llu\n", tx_write_requested_snapshot);
 	seq_printf(m, "tx_write_completed=%llu\n", tx_write_completed_snapshot);
 	seq_printf(m, "tx_write_short=%llu\n", tx_write_short_snapshot);
 	seq_printf(m, "tx_write_errors=%llu\n", tx_write_errors_snapshot);
-	seq_printf(m, "tx_ring_queued=%llu\n", tx_ring_queued_snapshot);
-	seq_printf(m, "tx_ring_dequeued=%llu\n", tx_ring_dequeued_snapshot);
-	seq_printf(m, "tx_ring_full_events=%llu\n", tx_ring_full_events_snapshot);
-	seq_printf(m, "tx_ring_full_waits=%llu\n", tx_ring_full_waits_snapshot);
-	seq_printf(m, "tx_fifo_fill_calls=%llu\n", tx_fifo_fill_calls_snapshot);
-	seq_printf(m, "tx_fifo_fill_aggressive_calls=%llu\n",
-		   tx_fifo_fill_aggressive_calls_snapshot);
-	seq_printf(m, "tx_fifo_bytes_loaded=%llu\n",
-		   tx_fifo_bytes_loaded_snapshot);
-	seq_printf(m, "tx_fifo_empty_observed=%llu\n",
-		   tx_fifo_empty_observed_snapshot);
-	seq_printf(m, "tx_fifo_full_observed=%llu\n",
-		   tx_fifo_full_observed_snapshot);
-	seq_printf(m, "tx_refill_on_write_calls=%llu\n",
-		   tx_refill_on_write_calls_snapshot);
-	seq_printf(m, "tx_refill_on_write_bytes=%llu\n",
-		   tx_refill_on_write_bytes_snapshot);
-	seq_printf(m, "tx_fifo_write_blocked_by_full=%llu\n",
-		   tx_fifo_write_blocked_by_full_snapshot);
-	seq_printf(m, "tx_fifo_fr_at_block=0x%08X\n",
-		   tx_fifo_fr_at_block_snapshot);
 	seq_printf(m, "tx_fifo_last_fr=0x%08X\n", tx_fifo_last_fr_snapshot);
-	seq_printf(m, "tx_forced_bytes_loaded=%llu\n",
-		   tx_forced_bytes_loaded_snapshot);
-	seq_printf(m, "tx_forced_last_fr_before=0x%08X\n",
-		   tx_forced_last_fr_before_snapshot);
-	seq_printf(m, "tx_forced_last_fr_after=0x%08X\n",
-		   tx_forced_last_fr_after_snapshot);
-	seq_printf(m, "tx_starvation_events=%llu\n",
-		   tx_starvation_events_snapshot);
-	seq_printf(m, "tx_no_writer_fill_calls=%llu\n",
-		   tx_no_writer_fill_calls_snapshot);
 	seq_printf(m, "tx_clear_events=%llu\n", tx_clear_events_snapshot);
+	seq_printf(m, "tx_dma_size=%zu\n", tx_dma_size_snapshot);
 
 	return 0;
 }
@@ -444,6 +323,17 @@ static const struct file_operations cm4_spi_regs_fops = {
 	.release = single_release,
 };
 
+static void tx_dma_buffer_free(void)
+{
+	if (!tx_dma_buf)
+		return;
+
+	dma_free_coherent(bsc_dev, tx_dma_size, tx_dma_buf, tx_dma_handle);
+	tx_dma_buf = NULL;
+	tx_dma_handle = 0;
+	WRITE_ONCE(tx_dma_size, 0);
+}
+
 static ssize_t cm4_spi_clear_tx_write(
 	struct file *file,
 	const char __user *buf,
@@ -456,8 +346,10 @@ static ssize_t cm4_spi_clear_tx_write(
 
 	mutex_lock(&tx_dma_mutex);
 	dmaengine_terminate_sync(tx_dma);
+	tx_dma_buffer_free();
 	tx_path_clear();
 	mutex_unlock(&tx_dma_mutex);
+	wake_up_interruptible(&tx_wait);
 	return count;
 }
 
@@ -467,45 +359,12 @@ static const struct file_operations cm4_spi_clear_tx_fops = {
 	.llseek = noop_llseek,
 };
 
-static ssize_t cm4_spi_tx_force_refill_write(
-	struct file *file,
-	const char __user *buf,
-	size_t count,
-	loff_t *ppos)
-{
-	unsigned int loaded;
-	u32 fr;
-
-	(void)file;
-	(void)buf;
-	(void)ppos;
-
-	loaded = cm4_bsc_fill_tx_fifo_aggressive();
-	fr = readl(bsc + BSC_FR);
-	pr_info("SPI Slave: tx_force_refill loaded=%u FR=0x%08X\n",
-		loaded,
-		fr);
-
-	return count;
-}
-
-static const struct file_operations cm4_spi_tx_force_refill_fops = {
-	.owner = THIS_MODULE,
-	.write = cm4_spi_tx_force_refill_write,
-	.llseek = noop_llseek,
-};
-
 static void tx_path_clear(void)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&tx_lock, flags);
-	tx_head = 0;
-	tx_tail = 0;
-	tx_count = 0;
-	tx_peak = 0;
 	tx_clear_events++;
-	tx_starved_latched = false;
 
 	if (bsc) {
 	writel(0x00000000, bsc + BSC_CR);
@@ -519,86 +378,7 @@ static void tx_path_clear(void)
 	}
 
 	spin_unlock_irqrestore(&tx_lock, flags);
-
-	wake_up_interruptible(&tx_wait);
 	pr_info("SPI Slave: TX path cleared\n");
-}
-
-static unsigned int cm4_bsc_tx_fifo_fill_aggressive_locked(void)
-{
-	u8 tx;
-	unsigned int loaded = 0;
-	u32 fr;
-
-	fr = readl(bsc + BSC_FR);
-	tx_fifo_last_fr = fr;
-
-	if (fr & FR_TXFE) {
-	tx_fifo_empty_observed++;
-	if (tx_writers > 0 && tx_count == 0) {
-		if (!tx_starved_latched) {
-		tx_starvation_events++;
-		tx_starved_latched = true;
-		}
-	}
-	}
-	if (fr & FR_TXFF)
-	tx_fifo_full_observed++;
-
-	if (tx_writers == 0) {
-	tx_no_writer_fill_calls++;
-	return 0;
-	}
-
-	while (tx_count > 0 && !(fr & FR_TXFF)) {
-	tx = tx_ring[tx_tail];
-	tx_tail = (tx_tail + 1) % TX_RING_SIZE;
-	tx_count--;
-	tx_ring_dequeued++;
-	tx_fifo_bytes_loaded++;
-	loaded++;
-	tx_starved_latched = false;
-
-	writel(tx, bsc + BSC_DR);
-	fr = readl(bsc + BSC_FR);
-	tx_fifo_last_fr = fr;
-
-	}
-
-	if (tx_count > 0 && (fr & FR_TXFF)) {
-	tx_fifo_write_blocked_by_full++;
-	tx_fifo_fr_at_block = fr;
-	}
-
-	if (tx_count > 0 && time_after(jiffies, last_tx_debug + HZ)) {
-	last_tx_debug = jiffies;
-	pr_info("TX stall? FR=0x%08X tx_count=%u tx_writers=%u fifo_loaded=%llu queued=%llu full_events=%llu\n",
-		fr,
-		tx_count,
-		tx_writers,
-		tx_fifo_bytes_loaded,
-		tx_ring_queued,
-		tx_ring_full_events);
-	}
-
-	return loaded;
-}
-
-static unsigned int cm4_bsc_fill_tx_fifo_aggressive(void)
-{
-	unsigned long flags;
-	unsigned int loaded;
-
-	spin_lock_irqsave(&tx_lock, flags);
-	tx_fifo_fill_calls++;
-	tx_fifo_fill_aggressive_calls++;
-	loaded = cm4_bsc_tx_fifo_fill_aggressive_locked();
-	spin_unlock_irqrestore(&tx_lock, flags);
-
-	if (loaded > 0)
-	wake_up_interruptible(&tx_wait);
-
-	return loaded;
 }
 
 static void rx_ring_push(u8 rx)
@@ -746,6 +526,9 @@ static ssize_t cm4_spi_slave_write(
 	unsigned long flags;
 	u32 fr;
 	u8 *bytes;
+	u32 *new_dma_buf;
+	dma_addr_t new_dma_handle;
+	size_t new_dma_size;
 	size_t i;
 	size_t pio_bytes;
 	size_t dma_bytes;
@@ -755,8 +538,8 @@ static ssize_t cm4_spi_slave_write(
 	(void)ppos;
 	if (count == 0)
 	return 0;
-	if (count > TX_RING_SIZE)
-	return -EMSGSIZE;
+	if (check_mul_overflow(count, sizeof(*new_dma_buf), &new_dma_size))
+	return -EOVERFLOW;
 
 	spin_lock_irqsave(&tx_lock, flags);
 	tx_write_calls++;
@@ -769,69 +552,91 @@ static ssize_t cm4_spi_slave_write(
 	goto record_error;
 	}
 
-	ret = mutex_lock_interruptible(&tx_dma_mutex);
-	if (ret) {
-	kfree(bytes);
+	new_dma_buf = dma_alloc_coherent(bsc_dev, new_dma_size,
+					 &new_dma_handle, GFP_KERNEL);
+	if (!new_dma_buf) {
+		ret = -ENOMEM;
+		kfree(bytes);
 		goto record_error;
 	}
 
-	/* Stop the old producer before resetting the peripheral. TX FIFO empty
-	 * does not imply that an earlier DMA descriptor has finished; without
-	 * termination it could refill the FIFO after the reset.
-	 *
-	 * A write publishes a response. It must not wait for the master to clock
-	 * that response; the next write atomically replaces it.
-	 */
+	if (file->f_flags & O_NONBLOCK) {
+		if (!mutex_trylock(&tx_dma_mutex)) {
+			ret = -EAGAIN;
+			goto free_new_buffer;
+		}
+	} else {
+		ret = mutex_lock_interruptible(&tx_dma_mutex);
+		if (ret)
+			goto free_new_buffer;
+	}
+
+	/* A new write replaces the previous published response. */
 	dmaengine_terminate_sync(tx_dma);
+	tx_dma_buffer_free();
 	tx_path_clear();
 
-	/* Prime the FIFO with CPU writes. Besides reducing DMA startup pressure,
-	 * this provides a known-good prologue while BSC DMA behavior is verified.
-	 */
+	/* Prime an optional prefix with CPU writes for diagnostics. */
 	pio_bytes = 0;
 	while (pio_bytes < count && pio_bytes < tx_pio_limit) {
-	fr = readl(bsc + BSC_FR);
-	if (fr & FR_TXFF)
-		break;
-	writel(bytes[pio_bytes], bsc + BSC_DR);
-	pio_bytes++;
+		fr = readl(bsc + BSC_FR);
+		if (fr & FR_TXFF)
+			break;
+		writel(bytes[pio_bytes], bsc + BSC_DR);
+		pio_bytes++;
 	}
 
 	if (pio_bytes == count) {
-	kfree(bytes);
-	goto write_success;
+		dma_free_coherent(bsc_dev, new_dma_size,
+				  new_dma_buf, new_dma_handle);
+		kfree(bytes);
+		goto write_success;
 	}
 
 	/* The DMA engine writes 32 bits; BSC_DR transmits the low byte. */
 	dma_bytes = count - pio_bytes;
 	for (i = 0; i < dma_bytes; i++)
-	tx_dma_buf[i] = bytes[pio_bytes + i];
+		new_dma_buf[i] = bytes[pio_bytes + i];
 	kfree(bytes);
+	bytes = NULL;
 
-	desc = dmaengine_prep_slave_single(tx_dma, tx_dma_handle,
-					   dma_bytes * sizeof(*tx_dma_buf),
+	desc = dmaengine_prep_slave_single(tx_dma, new_dma_handle,
+					   dma_bytes * sizeof(*new_dma_buf),
 					   DMA_MEM_TO_DEV,
 					   DMA_CTRL_ACK);
 	if (!desc) {
-	ret = -EIO;
-	goto unlock_error;
+		ret = -EIO;
+		goto unlock_free_buffer;
 	}
 	cookie = dmaengine_submit(desc);
 	ret = dma_submit_error(cookie);
 	if (ret)
-	goto unlock_error;
+		goto unlock_free_buffer;
 
+	tx_dma_buf = new_dma_buf;
+	tx_dma_handle = new_dma_handle;
+	WRITE_ONCE(tx_dma_size, new_dma_size);
 	dma_async_issue_pending(tx_dma);
 
 write_success:
 	mutex_unlock(&tx_dma_mutex);
+	wake_up_interruptible(&tx_wait);
 	spin_lock_irqsave(&tx_lock, flags);
 	tx_write_completed += count;
 	spin_unlock_irqrestore(&tx_lock, flags);
 	return count;
 
-unlock_error:
+unlock_free_buffer:
+	dma_free_coherent(bsc_dev, new_dma_size,
+			  new_dma_buf, new_dma_handle);
 	mutex_unlock(&tx_dma_mutex);
+	wake_up_interruptible(&tx_wait);
+	goto record_error;
+
+free_new_buffer:
+	dma_free_coherent(bsc_dev, new_dma_size,
+			  new_dma_buf, new_dma_handle);
+	kfree(bytes);
 record_error:
 	spin_lock_irqsave(&tx_lock, flags);
 	tx_write_errors++;
@@ -872,8 +677,10 @@ static int cm4_spi_slave_release(struct inode *inode, struct file *file)
 	if (clear_tx) {
 	mutex_lock(&tx_dma_mutex);
 	dmaengine_terminate_sync(tx_dma);
+	tx_dma_buffer_free();
 	tx_path_clear();
 	mutex_unlock(&tx_dma_mutex);
+	wake_up_interruptible(&tx_wait);
 	}
 	}
 
@@ -893,10 +700,10 @@ static __poll_t cm4_spi_slave_poll(struct file *file, poll_table *wait)
 	mask |= POLLIN | POLLRDNORM;
 	spin_unlock_irqrestore(&rx_lock, flags);
 
-	spin_lock_irqsave(&tx_lock, flags);
-	if (tx_count < TX_RING_SIZE)
+	if ((file->f_mode & FMODE_WRITE) && mutex_trylock(&tx_dma_mutex)) {
 	mask |= POLLOUT | POLLWRNORM;
-	spin_unlock_irqrestore(&tx_lock, flags);
+	mutex_unlock(&tx_dma_mutex);
+	}
 
 	return mask;
 }
@@ -926,7 +733,6 @@ static int monitor_thread(void *arg)
 
 	while (!kthread_should_stop()) {
 	cm4_bsc_drain_rx_fifo();
-	cm4_bsc_fill_tx_fifo_aggressive();
 
 	usleep_range(poll_interval_us, poll_interval_us + 10);
 	}
@@ -990,26 +796,18 @@ static int bcm_spi_probe(struct platform_device *pdev)
 	goto err_release_dma;
 	}
 
-	tx_dma_buf = dma_alloc_coherent(&pdev->dev,
-		TX_RING_SIZE * sizeof(*tx_dma_buf), &tx_dma_handle, GFP_KERNEL);
-	if (!tx_dma_buf) {
-	ret = -ENOMEM;
-	dev_err(&pdev->dev, "failed to allocate TX DMA buffer\n");
-	goto err_release_dma;
-	}
+	bsc_dev = &pdev->dev;
+	tx_dma_buf = NULL;
+	tx_dma_handle = 0;
+	tx_dma_size = 0;
 
 	spin_lock_init(&rx_lock);
 	spin_lock_init(&tx_lock);
 	rx_head = 0;
 	rx_tail = 0;
 	rx_count = 0;
-	tx_head = 0;
-	tx_tail = 0;
-	tx_count = 0;
-	tx_peak = 0;
 	tx_writers = 0;
 	cm4_spi_reset_stats();
-	last_tx_debug = 0;
 
 	writel(0x00000000, bsc + BSC_CR);
 	udelay(100);
@@ -1044,8 +842,6 @@ static int bcm_spi_probe(struct platform_device *pdev)
 				&cm4_spi_reset_fops);
 	debugfs_create_file("clear_tx", 0200, debugfs_dir, NULL,
 				&cm4_spi_clear_tx_fops);
-	debugfs_create_file("tx_force_refill", 0200, debugfs_dir, NULL,
-				&cm4_spi_tx_force_refill_fops);
 	pr_info("SPI Slave: debugfs at /sys/kernel/debug/cm4_spi_slave\n");
 	}
 
@@ -1068,14 +864,10 @@ static int bcm_spi_probe(struct platform_device *pdev)
 	return 0;
 
 err_release_dma:
-	if (tx_dma_buf) {
-	dma_free_coherent(&pdev->dev,
-		TX_RING_SIZE * sizeof(*tx_dma_buf),
-		tx_dma_buf, tx_dma_handle);
-	tx_dma_buf = NULL;
-	}
+	tx_dma_buffer_free();
 	dma_release_channel(tx_dma);
 	tx_dma = NULL;
+	bsc_dev = NULL;
 	bsc = NULL;
 	return ret;
 }
@@ -1099,15 +891,11 @@ static void bcm_spi_remove(struct platform_device *pdev)
 
 	if (tx_dma) {
 	dmaengine_terminate_sync(tx_dma);
-	if (tx_dma_buf) {
-	dma_free_coherent(&pdev->dev,
-		TX_RING_SIZE * sizeof(*tx_dma_buf),
-		tx_dma_buf, tx_dma_handle);
-	tx_dma_buf = NULL;
-	}
+	tx_dma_buffer_free();
 	dma_release_channel(tx_dma);
 	tx_dma = NULL;
 	}
+	bsc_dev = NULL;
 	bsc = NULL;
 
 	pr_info("SPI Slave: exit\n");
@@ -1132,3 +920,4 @@ module_platform_driver(bcm_spi_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Muhammad");
 MODULE_DESCRIPTION("Experimental BCM2711 BSC SPI slave character driver");
+MODULE_VERSION("0.1.0");

@@ -1,12 +1,13 @@
 # Installation Guide
 
-This guide installs the BCM2711 SPI slave driver on a Raspberry Pi Compute
+This guide installs the BCM2711 SPI slave driver on a Raspberry Pi 4 or Compute
 Module 4.
 
 ## 1. Check the hardware
 
-Use this driver only on a Compute Module 4 with a BCM2711. SPI signals must use
-3.3 V levels, and the CM4 and SPI master must share a ground.
+Use this driver only on a Raspberry Pi 4 or Compute Module 4 with a BCM2711.
+SPI signals must use 3.3 V levels, and the Raspberry Pi and SPI master must
+share a ground.
 
 The driver does not configure pin multiplexing. Configure the BSC pins required
 by your carrier board before testing SPI communication.
@@ -18,7 +19,7 @@ Before installing the driver, check whether the machine needs a reboot:
 ```bash
 test -e /var/run/reboot-required && cat /var/run/reboot-required
 ```
-
+not nneded if nothingis returned.
 If a reboot is required, reboot before continuing:
 
 ```bash
@@ -42,7 +43,11 @@ The kernel headers must match the output of `uname -r` exactly.
 
 ## 4. Install the driver
 
-Open a terminal in the downloaded repository and run:
+Open a terminal in the downloaded repository, eg :
+```txt
+ ~/bcm2711-spi-slave-driver
+```
+and run:
 
 ```bash
 sudo ./scripts/install.sh
@@ -60,6 +65,41 @@ Reboot to activate the overlay:
 ```bash
 sudo reboot
 ```
+
+The installer validates the module version and kernel before changing the
+system. It stages the module and overlay, records their checksums, and restores
+the previous installed files if the replacement fails.
+
+## Reinstalling or changing versions
+
+Installing a different release replaces the previous release because all
+releases use the same module, overlay, and device names. The installer does not
+load two versions side by side.
+
+The module already held in memory does not change when its file is replaced.
+Always reboot after installing so the module and Device Tree overlay from the
+new installation become active together.
+
+The completed installation is recorded in:
+
+```text
+/var/lib/bcm2711-spi-slave/install.conf
+```
+
+This file contains the installed driver version, target kernel, and checksums
+of the module and overlay.
+
+## Cleaning build files
+
+Building or installing creates temporary files inside `driver/` and a compiled
+overlay inside `overlay/`. Remove only these repository build artifacts with:
+
+```bash
+./scripts/clean.sh
+```
+
+This command does not unload the driver and does not remove anything installed
+under `/lib/modules`, `/boot`, or `/etc`.
 
 ## 5. Verify the installation
 
@@ -114,4 +154,3 @@ sudo reboot
 
 The uninstall script removes the module, overlay, automatic module-loading
 configuration, and the overlay entry from the boot configuration.
-

@@ -1,7 +1,7 @@
 # BCM2711 SPI Slave Driver
 
-An experimental Linux driver that lets a Raspberry Pi Compute Module 4 act as
-an SPI slave.
+An experimental Linux driver that lets a BCM2711-based Raspberry Pi 4 or
+Compute Module 4 act as an SPI slave.
 
 The driver creates:
 
@@ -15,7 +15,7 @@ The driver creates:
 
 ## Hardware
 
-- Raspberry Pi Compute Module 4 with BCM2711
+- Raspberry Pi 4 or Compute Module 4 with BCM2711
 - 3.3 V SPI signals with a shared ground
 - SPI mode 0 at 100 kHz recommended for initial testing
 
@@ -30,6 +30,11 @@ sudo ./scripts/install.sh
 sudo reboot
 ```
 
+Running the installer again safely replaces the installed files. Installing a
+newer release replaces the previous release; reboot afterward so the module and
+overlay from the same version become active together. A failed replacement is
+rolled back automatically.
+
 See the [installation guide](docs/installation.md) for requirements,
 verification, kernel upgrades, removal, and guidance about keeping the source
 folder.
@@ -38,16 +43,20 @@ folder.
 
 The first byte from the master selects the direction:
 
-- `0x00`: the master sends data to the CM4.
-- `0x01`: the master reads a prepared response from the CM4.
+- `0x00`: the master sends data to the Raspberry Pi.
+- `0x01`: the master reads a prepared response from the Raspberry Pi.
 
 Each application `write()` publishes one response. A later write replaces any
 response that has not finished transmitting.
 
 ## Status
 
-This driver is experimental and supports BCM2711 only. Transmission uses DMA;
-reception uses a polling thread. There is no READY GPIO.
+Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry
+Pi 4 and Compute Module 4. Existing hardware testing has used CM4 systems.
+Transmission uses DMA; reception uses a polling thread. There is no READY GPIO.
+
+Development and release requirements are tracked in the
+[release checklist](docs/release-checklist.md).
 
 ## License
 

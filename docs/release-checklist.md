@@ -44,9 +44,8 @@ tests have passed on the release candidate.
 - [x] Document blocking and nonblocking behavior and all expected errors.
 - [x] Document response replacement and DMA completion semantics.
 - [x] Document RX overflow behavior and the SPI direction bytes.
-- [x] Keep `/dev/cm4_spi_slave` for compatibility with existing ROS 2 and
-  Python applications.
-- [x] Avoid a compatibility alias by keeping the existing device name.
+- [x] Use the hardware-based `/dev/bcm2711_spi_slave` device name.
+- [x] Update existing ROS 2 and Python applications before the v0.1 release.
 - [x] Remove the obsolete fixed-size TX software ring.
 - [x] Allocate the TX DMA buffer according to each write size.
 - [x] Define practical DMA allocation and descriptor failure behavior.
@@ -78,7 +77,7 @@ tests have passed on the release candidate.
 - [x] Validate module version and kernel vermagic before installation.
 - [x] Stage module and overlay replacements and roll back failed installs.
 - [x] Record installed version, kernel, and artifact checksums.
-- [x] Refuse scripted uninstall while `/dev/cm4_spi_slave` is open.
+- [x] Refuse scripted uninstall while `/dev/bcm2711_spi_slave` is open.
 - [ ] Add DKMS only after the driver lifecycle and ABI are stable.
 - [ ] Test automatic rebuilds across at least two kernel upgrades.
 - [ ] Add and test a udev rule for non-root access.

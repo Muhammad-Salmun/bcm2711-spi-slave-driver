@@ -8,7 +8,7 @@ import select
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", default="/dev/cm4_spi_slave")
+    parser.add_argument("--device", default="/dev/bcm2711_spi_slave")
     parser.add_argument(
         "--events",
         choices=("read", "write", "both"),

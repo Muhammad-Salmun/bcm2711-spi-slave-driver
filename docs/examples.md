@@ -1,7 +1,7 @@
 # Python Examples
 
 The scripts in `examples/` use only the Python standard library and communicate
-with the installed driver through `/dev/cm4_spi_slave`.
+with the installed driver through `/dev/bcm2711_spi_slave`.
 
 Continuously read received SPI payload data:
 

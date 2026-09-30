@@ -498,7 +498,7 @@ static int rx_ring_pop(struct bcm_spi_slave *spi, u8 *rx)
 	return ret;
 }
 
-static ssize_t cm4_spi_slave_read(
+static ssize_t bcm2711_spi_slave_read(
 	struct file *file,
 	char __user *buf,
 	size_t count,
@@ -547,7 +547,7 @@ static ssize_t cm4_spi_slave_read(
 	return copied;
 }
 
-static ssize_t cm4_spi_slave_write(
+static ssize_t bcm2711_spi_slave_write(
 	struct file *file,
 	const char __user *buf,
 	size_t count,
@@ -685,7 +685,7 @@ record_error:
 	return ret;
 }
 
-static int cm4_spi_slave_open(struct inode *inode, struct file *file)
+static int bcm2711_spi_slave_open(struct inode *inode, struct file *file)
 {
 	struct miscdevice *miscdev = file->private_data;
 	struct bcm_spi_slave *spi = container_of(miscdev,
@@ -723,7 +723,7 @@ static int cm4_spi_slave_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int cm4_spi_slave_release(struct inode *inode, struct file *file)
+static int bcm2711_spi_slave_release(struct inode *inode, struct file *file)
 {
 	struct bcm_spi_slave *spi = file->private_data;
 	unsigned long flags;
@@ -754,7 +754,7 @@ static int cm4_spi_slave_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static __poll_t cm4_spi_slave_poll(struct file *file, poll_table *wait)
+static __poll_t bcm2711_spi_slave_poll(struct file *file, poll_table *wait)
 {
 	struct bcm_spi_slave *spi = file->private_data;
 	__poll_t mask = 0;
@@ -779,13 +779,13 @@ static __poll_t cm4_spi_slave_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-static const struct file_operations cm4_spi_slave_fops = {
+static const struct file_operations bcm2711_spi_slave_fops = {
 	.owner = THIS_MODULE,
-	.open = cm4_spi_slave_open,
-	.release = cm4_spi_slave_release,
-	.read = cm4_spi_slave_read,
-	.write = cm4_spi_slave_write,
-	.poll = cm4_spi_slave_poll,
+	.open = bcm2711_spi_slave_open,
+	.release = bcm2711_spi_slave_release,
+	.read = bcm2711_spi_slave_read,
+	.write = bcm2711_spi_slave_write,
+	.poll = bcm2711_spi_slave_poll,
 	.llseek = noop_llseek,
 };
 
@@ -897,21 +897,21 @@ static int bcm_spi_probe(struct platform_device *pdev)
 
 	spi->miscdev.minor = MISC_DYNAMIC_MINOR;
 	if (spi->id == 0)
-		spi->miscdev.name = "cm4_spi_slave";
+		spi->miscdev.name = "bcm2711_spi_slave";
 	else
 		spi->miscdev.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
-						   "cm4_spi_slave%d", spi->id);
+						   "bcm2711_spi_slave%d", spi->id);
 	if (!spi->miscdev.name) {
 		ret = -ENOMEM;
 		goto err_release_dma;
 	}
-	spi->miscdev.fops = &cm4_spi_slave_fops;
+	spi->miscdev.fops = &bcm2711_spi_slave_fops;
 	spi->miscdev.parent = &pdev->dev;
 	spi->miscdev.mode = 0660;
 	ret = misc_register(&spi->miscdev);
 	if (ret) {
 	dev_err(&pdev->dev,
-		"failed to register /dev/cm4_spi_slave: %d\n", ret);
+		"failed to register /dev/bcm2711_spi_slave: %d\n", ret);
 	goto err_release_dma;
 	}
 

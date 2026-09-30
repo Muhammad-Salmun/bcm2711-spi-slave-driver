@@ -3,7 +3,7 @@
 
 import os
 
-DEVICE = "/dev/cm4_spi_slave"
+DEVICE = "/dev/bcm2711_spi_slave"
 CHUNK_SIZE = 1024
 
 

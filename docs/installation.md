@@ -122,7 +122,7 @@ After rebooting, check the module and device file:
 
 ```bash
 lsmod | grep bcm2711_spi_slave
-ls -l /dev/cm4_spi_slave
+ls -l /dev/bcm2711_spi_slave
 ```
 
 Check the Device Tree overlay:
@@ -132,7 +132,7 @@ test -d /sys/firmware/devicetree/base/soc/spi-slave@7e214000 \
   && echo "SPI slave overlay is active"
 ```
 
-If `/dev/cm4_spi_slave` is missing, inspect the boot log:
+If `/dev/bcm2711_spi_slave` is missing, inspect the boot log:
 
 ```bash
 sudo dmesg | grep -i -E 'bcm2711|spi slave|cm4_spi'
@@ -169,5 +169,5 @@ sudo reboot
 
 The uninstall script removes the module, overlay, automatic module-loading
 configuration, and the overlay entry from the boot configuration. It refuses
-to continue while a process has `/dev/cm4_spi_slave` open. Stop the listed
+to continue while a process has `/dev/bcm2711_spi_slave` open. Stop the listed
 application and run the script again.

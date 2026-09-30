@@ -4,7 +4,7 @@ set -euo pipefail
 
 MODULE_NAME="bcm2711_spi_slave"
 OVERLAY_NAME="bcm2711-bsc-spi-slave"
-DEVICE_PATH="/dev/cm4_spi_slave"
+DEVICE_PATH="/dev/bcm2711_spi_slave"
 KERNEL_RELEASE="$(uname -r)"
 MODULE_LOAD_FILE="/etc/modules-load.d/${MODULE_NAME}.conf"
 STATE_DIR="/var/lib/bcm2711-spi-slave"

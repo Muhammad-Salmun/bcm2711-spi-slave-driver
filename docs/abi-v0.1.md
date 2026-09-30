@@ -6,13 +6,13 @@ module parameters are diagnostic interfaces and are not part of this ABI.
 
 ## Device
 
-The first bound device is `/dev/cm4_spi_slave`. This name is retained for
-compatibility with existing ROS 2 and Python applications, even though the
-driver also supports Raspberry Pi 4.
+The first bound device is `/dev/bcm2711_spi_slave`. The hardware-based name is
+the same on Raspberry Pi 4 and Compute Module 4.
 
 If more than one matching Device Tree node is present, later instances are
-named `/dev/cm4_spi_slave1`, `/dev/cm4_spi_slave2`, and so on. Numbered names
-depend on probe order and must not be treated as persistent hardware IDs.
+named `/dev/bcm2711_spi_slave1`, `/dev/bcm2711_spi_slave2`, and so on.
+Numbered names depend on probe order and must not be treated as persistent
+hardware IDs.
 
 The device supports `O_RDONLY`, `O_WRONLY`, and `O_RDWR`. `O_NONBLOCK` changes
 the behavior described below. There are no ioctls in ABI v0.1.

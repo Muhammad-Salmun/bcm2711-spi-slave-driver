@@ -8,7 +8,7 @@ import signal
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", default="/dev/cm4_spi_slave")
+    parser.add_argument("--device", default="/dev/bcm2711_spi_slave")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--text", help="UTF-8 text response")
     source.add_argument("--file", help="binary response file")

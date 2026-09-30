@@ -6,7 +6,7 @@ Compute Module 4 act as an SPI slave.
 The driver creates:
 
 ```text
-/dev/cm4_spi_slave
+/dev/bcm2711_spi_slave
 ```
 
 - Read from the device to receive bytes from the SPI master.
@@ -63,7 +63,7 @@ The simplest receiver is `examples/read.py`:
 python3 examples/read.py
 ```
 
-It opens `/dev/cm4_spi_slave` and repeatedly calls `read()` for up to 1024
+It opens `/dev/bcm2711_spi_slave` and repeatedly calls `read()` for up to 1024
 bytes. Each call waits until at least one byte is available, then returns with
 between 1 and 1024 currently queued bytes. The script prints the actual size
 and contents of every returned chunk. Change `CHUNK_SIZE` near the top of the
@@ -77,8 +77,8 @@ Transmission uses DMA; reception uses a polling thread.
 
 Each matching Device Tree node has independent driver state, DMA resources,
 buffers, locks, counters, and debugfs entries. The first instance uses
-`/dev/cm4_spi_slave`; additional instances use numbered device names such as
-`/dev/cm4_spi_slave1`.
+`/dev/bcm2711_spi_slave`; additional instances use numbered device names such
+as `/dev/bcm2711_spi_slave1`.
 
 Development and release requirements are tracked in the
 [release checklist](docs/release-checklist.md).

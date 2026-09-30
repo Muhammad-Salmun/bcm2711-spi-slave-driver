@@ -49,16 +49,16 @@ the Raspberry Pi is acting as the slave, the signal directions are different
 from its usual SPI-master role. Follow the wiring table in the
 [installation guide](docs/installation.md) when connecting MOSI and MISO.
 
-**Correct: cross MOSI and MISO between the SPI master and Raspberry Pi slave.**
-
-<img src="docs/correct_spi_rpi4_connection.jpeg"
-     alt="Correct Raspberry Pi SPI slave connection with MOSI and MISO crossed"
-     width="320">
-
 **Incorrect: do not connect MOSI to MOSI and MISO to MISO.**
 
 <img src="docs/incorrect_spi_rpi4_connection.jpeg"
      alt="Incorrect Raspberry Pi SPI slave connection without crossing MOSI and MISO"
+     width="320">
+
+**Correct: cross MOSI and MISO between the SPI master and Raspberry Pi slave.**
+
+<img src="docs/correct_spi_rpi4_connection.jpeg"
+     alt="Correct Raspberry Pi SPI slave connection with MOSI and MISO crossed"
      width="320">
 
 The installer adds a Device Tree overlay that configures the pin controller

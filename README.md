@@ -53,13 +53,13 @@ from its usual SPI-master role. Follow the wiring table in the
 
 <img src="docs/correct_spi_rpi4_connection.jpeg"
      alt="Correct Raspberry Pi SPI slave connection with MOSI and MISO crossed"
-     width="640">
+     width="320">
 
 **Incorrect: do not connect MOSI to MOSI and MISO to MISO.**
 
 <img src="docs/incorrect_spi_rpi4_connection.jpeg"
      alt="Incorrect Raspberry Pi SPI slave connection without crossing MOSI and MISO"
-     width="640">
+     width="320">
 
 The installer adds a Device Tree overlay that configures the pin controller
 automatically after reboot. SPI0 and this SPI-slave driver cannot own these

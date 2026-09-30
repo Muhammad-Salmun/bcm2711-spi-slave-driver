@@ -9,13 +9,15 @@ I built this experimental driver to solve that problem.
 
 ## Quick Start
 
-After installing the matching kernel headers, run:
+After cloning this repo, from the repo folder, run:
 
 ```bash
 sudo ./scripts/install.sh
 sudo reboot
 ```
 
+Make sure the headers matching your running kernel are installed. See the
+[installation guide](docs/installation.md) for details.
 After rebooting, the driver exposes this character device:
 
 ```text

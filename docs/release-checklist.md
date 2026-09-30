@@ -53,14 +53,14 @@ tests have passed on the release candidate.
 - [x] Keep all debugfs files outside the stable userspace ABI.
 - [x] Publish the frozen ABI as a versioned document.
 
-## 5. Test utility
+## 5. Python examples
 
-- [x] Add a small C utility that can open the character device.
+- [x] Add Python examples that can open the character device.
 - [x] Support blocking and nonblocking reads.
 - [x] Support writes of binary and text data.
 - [x] Demonstrate `poll()` for readable and writable events.
 - [x] Report kernel errors clearly.
-- [ ] Include repeatable loopback or master/slave test instructions.
+- [ ] Include repeatable master/slave test instructions.
 
 ## 6. Platform testing
 

@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DRIVER_DIR="${PROJECT_DIR}/driver"
 OVERLAY_DIR="${PROJECT_DIR}/overlay"
-TOOLS_DIR="${PROJECT_DIR}/tools"
 KERNEL_BUILD="/lib/modules/$(uname -r)/build"
 
 if [[ -d ${KERNEL_BUILD} ]]; then
@@ -21,6 +20,5 @@ else
 fi
 
 make -C "${OVERLAY_DIR}" clean
-make -C "${TOOLS_DIR}" clean
 
 echo "Build artifacts removed. Installed driver files were not changed."

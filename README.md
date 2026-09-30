@@ -54,8 +54,8 @@ response that has not finished transmitting.
 The complete character-device contract is defined in the
 [userspace ABI v0.1](docs/abi-v0.1.md).
 
-A small C utility for reading, publishing responses, and testing `poll()` is
-documented in the [test utility guide](docs/test-utility.md).
+Dependency-free Python scripts for reading, publishing responses, and testing
+`poll()` are documented in the [examples guide](docs/examples.md).
 
 ## Status
 

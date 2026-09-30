@@ -51,6 +51,9 @@ The first byte from the master selects the direction:
 Each application `write()` publishes one response. A later write replaces any
 response that has not finished transmitting.
 
+The complete character-device contract is defined in the
+[userspace ABI v0.1](docs/abi-v0.1.md).
+
 ## Status
 
 Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry

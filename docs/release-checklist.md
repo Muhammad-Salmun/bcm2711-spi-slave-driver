@@ -40,19 +40,18 @@ tests have passed on the release candidate.
 
 ## 4. Userspace ABI
 
-- [ ] Document `open()`, `read()`, `write()`, `poll()`, and close behavior.
-- [ ] Document blocking and nonblocking behavior and all expected errors.
-- [ ] Document response replacement and DMA completion semantics.
-- [ ] Document RX overflow behavior and the SPI direction bytes.
-- [ ] Decide whether to keep `/dev/cm4_spi_slave` for compatibility or rename
-  it to `/dev/bcm2711_spi_slave` before freezing the ABI.
-- [ ] If the device is renamed, provide and test a compatibility path for
-  existing ROS 2 and Python applications.
+- [x] Document `open()`, `read()`, `write()`, `poll()`, and close behavior.
+- [x] Document blocking and nonblocking behavior and all expected errors.
+- [x] Document response replacement and DMA completion semantics.
+- [x] Document RX overflow behavior and the SPI direction bytes.
+- [x] Keep `/dev/cm4_spi_slave` for compatibility with existing ROS 2 and
+  Python applications.
+- [x] Avoid a compatibility alias by keeping the existing device name.
 - [x] Remove the obsolete fixed-size TX software ring.
 - [x] Allocate the TX DMA buffer according to each write size.
-- [ ] Define practical DMA allocation and descriptor failure behavior.
-- [ ] Decide which debugfs files are stable diagnostics and which are internal.
-- [ ] Publish the frozen ABI as a versioned document.
+- [x] Define practical DMA allocation and descriptor failure behavior.
+- [x] Keep all debugfs files outside the stable userspace ABI.
+- [x] Publish the frozen ABI as a versioned document.
 
 ## 5. Test utility
 

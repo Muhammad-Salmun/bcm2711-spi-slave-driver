@@ -25,11 +25,11 @@ tests have passed on the release candidate.
 
 ## 2. Per-device state
 
-- [ ] Move MMIO, DMA, buffers, locks, counters, wait queues, and worker state
+- [x] Move MMIO, DMA, buffers, locks, counters, wait queues, and worker state
   from global variables into one device structure.
-- [ ] Store and retrieve the structure through platform-device and file state.
-- [ ] Remove assumptions that only one matching Device Tree node can exist.
-- [ ] Confirm debugfs entries address the correct device instance.
+- [x] Store and retrieve the structure through platform-device and file state.
+- [x] Remove assumptions that only one matching Device Tree node can exist.
+- [x] Confirm debugfs entries address the correct device instance.
 
 ## 3. Device Tree and pin control
 

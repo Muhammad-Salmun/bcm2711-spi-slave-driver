@@ -55,6 +55,11 @@ Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry
 Pi 4 and Compute Module 4. Existing hardware testing has used CM4 systems.
 Transmission uses DMA; reception uses a polling thread. There is no READY GPIO.
 
+Each matching Device Tree node has independent driver state, DMA resources,
+buffers, locks, counters, and debugfs entries. The first instance uses
+`/dev/cm4_spi_slave`; additional instances use numbered device names such as
+`/dev/cm4_spi_slave1`.
+
 Development and release requirements are tracked in the
 [release checklist](docs/release-checklist.md).
 

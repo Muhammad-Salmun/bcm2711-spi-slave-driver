@@ -33,8 +33,8 @@ tests have passed on the release candidate.
 
 ## 3. Device Tree and pin control
 
-- [ ] Add the required BCM2711 BSC pinctrl configuration to the overlay.
-- [ ] Document the physical CM4 pins and carrier-board wiring.
+- [x] Add the required BCM2711 BSC pinctrl configuration to the overlay.
+- [x] Document the physical CM4 pins and carrier-board wiring.
 - [ ] Confirm that conflicting pin users fail clearly.
 - [ ] Validate the overlay on Raspberry Pi OS Bookworm and Ubuntu.
 

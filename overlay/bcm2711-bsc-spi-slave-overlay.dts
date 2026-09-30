@@ -14,6 +14,8 @@
 			bsc_spi_slave: spi-slave@7e214000 {
 				compatible = "eccb,bcm2711-bsc-spi-slave";
 				reg = <0x7e214000 0x1000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c_slave_gpio8>;
 
 				/* BCM2711 DREQ 8 is TX; DREQ 9 is RX. */
 				dmas = <&dma 8>, <&dma 9>;

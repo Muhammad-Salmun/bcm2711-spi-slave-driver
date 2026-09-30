@@ -17,9 +17,11 @@ The driver creates:
 
 - Raspberry Pi 4 or Compute Module 4 with BCM2711
 - 3.3 V SPI signals with a shared ground
+- BSC slave signals on GPIO8-11
 - SPI mode 0 at 100 kHz recommended for initial testing
 
-Pin multiplexing must be configured separately for the carrier board.
+The Device Tree overlay configures GPIO8-11 for the BSC slave peripheral.
+These pins are also used by SPI0, so SPI0 must not be enabled at the same time.
 
 ## Install
 
@@ -53,7 +55,7 @@ response that has not finished transmitting.
 
 Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry
 Pi 4 and Compute Module 4. Existing hardware testing has used CM4 systems.
-Transmission uses DMA; reception uses a polling thread. There is no READY GPIO.
+Transmission uses DMA; reception uses a polling thread.
 
 Each matching Device Tree node has independent driver state, DMA resources,
 buffers, locks, counters, and debugfs entries. The first instance uses

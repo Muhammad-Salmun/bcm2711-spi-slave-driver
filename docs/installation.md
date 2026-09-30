@@ -9,8 +9,23 @@ Use this driver only on a Raspberry Pi 4 or Compute Module 4 with a BCM2711.
 SPI signals must use 3.3 V levels, and the Raspberry Pi and SPI master must
 share a ground.
 
-The driver does not configure pin multiplexing. Configure the BSC pins required
-by your carrier board before testing SPI communication.
+The overlay configures these BCM2711 pins for the BSC slave peripheral. The
+header numbers apply to a Raspberry Pi 4 or a CM4 carrier with the standard
+40-pin layout, such as the CM4 IO Board:
+
+| Signal | Direction at Raspberry Pi | GPIO | 40-pin header |
+| --- | --- | --- | --- |
+| CE_N | Input | GPIO8 | Pin 24 |
+| MISO | Output | GPIO9 | Pin 21 |
+| MOSI | Input | GPIO10 | Pin 19 |
+| SCLK | Input | GPIO11 | Pin 23 |
+
+Connect a ground pin, such as physical pin 25, to the SPI master's ground.
+On a custom CM4 carrier, route the named GPIO signals and ground according to
+that carrier's schematic instead of relying on the header numbers.
+The same GPIOs are used by SPI0 in its normal mode. Disable `dtparam=spi=on`
+and any SPI0 overlays before enabling this driver; the BSC slave and SPI0
+cannot own GPIO8-11 at the same time.
 
 ## 2. Reboot after system updates
 

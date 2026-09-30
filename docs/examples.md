@@ -11,8 +11,7 @@ python3 examples/read.py
 
 The script requests up to 1024 bytes per blocking `read()`, prints the actual
 number of bytes returned, and waits for the next chunk. A returned chunk can be
-as small as one byte. Change the `CHUNK_SIZE` constant near the top of the
-script to use another maximum. Stop it with `Ctrl-C`.
+as small as one byte. Stop it with `Ctrl-C`.
 
 Publish a text response:
 

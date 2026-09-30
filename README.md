@@ -1,87 +1,80 @@
 # BCM2711 SPI Slave Driver
 
-An experimental Linux driver that lets a BCM2711-based Raspberry Pi 4 or
-Compute Module 4 act as an SPI slave.
+Linux has an SPI framework with slave-controller support, but it does not
+provide a standard driver for using the BCM2711 BSC peripheral as an SPI
+slave. This makes using a Raspberry Pi 4 or Compute Module 4 as an SPI slave
+far more difficult than it should be.
 
-The driver creates:
+I built this experimental driver to solve that problem.
 
-```text
-/dev/bcm2711_spi_slave
-```
+## Quick Start
 
-- Read from the device to receive bytes from the SPI master.
-- Write to the device to prepare a response for the SPI master.
-- Use `poll()` or `select()` to wait for received data.
-
-## Hardware
-
-- Raspberry Pi 4 or Compute Module 4 with BCM2711
-- 3.3 V SPI signals with a shared ground
-- BSC slave signals on GPIO8-11
-- SPI mode 0 at 100 kHz recommended for initial testing
-
-The Device Tree overlay configures GPIO8-11 for the BSC slave peripheral.
-These pins are also used by SPI0, so SPI0 must not be enabled at the same time.
-
-## Install
-
-Install the matching kernel headers, then run:
+After installing the matching kernel headers, run:
 
 ```bash
 sudo ./scripts/install.sh
 sudo reboot
 ```
 
-Running the installer again safely replaces the installed files. Installing a
-newer release replaces the previous release; reboot afterward so the module and
-overlay from the same version become active together. A failed replacement is
-rolled back automatically.
+After rebooting, the driver exposes this character device:
 
-See the [installation guide](docs/installation.md) for requirements,
-verification, kernel upgrades, removal, and guidance about keeping the source
-folder.
-
-## SPI protocol
-
-The first byte from the master selects the direction:
-
-- `0x00`: the master sends data to the Raspberry Pi.
-- `0x01`: the master reads a prepared response from the Raspberry Pi.
-
-Each application `write()` publishes one response. A later write replaces any
-response that has not finished transmitting.
-
-The complete character-device contract is defined in the
-[userspace ABI v0.1](docs/abi-v0.1.md).
-
-Dependency-free Python scripts for reading, publishing responses, and testing
-`poll()` are documented in the [examples guide](docs/examples.md).
-
-The simplest receiver is `examples/read.py`:
-
-```bash
-python3 examples/read.py
+```text
+/dev/bcm2711_spi_slave
 ```
 
-It opens `/dev/bcm2711_spi_slave` and repeatedly calls `read()` for up to 1024
-bytes. Each call waits until at least one byte is available, then returns with
-between 1 and 1024 currently queued bytes. The script prints the actual size
-and contents of every returned chunk. Change `CHUNK_SIZE` near the top of the
-script when a different maximum is needed. Stop it with `Ctrl-C`.
+Applications can communicate with it from C, Python, ROS 2, or any other
+language that can use normal file operations:
 
-## Status
+- `read()` receives bytes sent by the SPI master.
+- `write()` prepares bytes for the SPI master to read.
+- `poll()` waits efficiently until reading or writing is ready.
 
-Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry
-Pi 4 and Compute Module 4. Existing hardware testing has used CM4 systems.
-Transmission uses DMA; reception uses a polling thread.
+See the [userspace ABI](docs/abi-v0.1.md) for the exact behavior of these
+operations.
 
-Each matching Device Tree node has independent driver state, DMA resources,
-buffers, locks, counters, and debugfs entries. The first instance uses
-`/dev/bcm2711_spi_slave`; additional instances use numbered device names such
-as `/dev/bcm2711_spi_slave1`.
+## Python Examples
 
-Development and release requirements are tracked in the
-[release checklist](docs/release-checklist.md).
+The [`examples`](examples) directory contains simple Python scripts for
+reading, writing, and testing `poll()` after installing the driver. They use
+only the Python standard library.
+
+See the [examples guide](docs/examples.md) for commands and expected behavior.
+
+## SPI Pins
+
+The driver uses GPIO8-11, the same GPIO group normally used by SPI0. Because
+the Raspberry Pi is acting as the slave, the signal directions are different
+from its usual SPI-master role. Follow the wiring table in the
+[installation guide](docs/installation.md) when connecting MOSI and MISO.
+
+The installer adds a Device Tree overlay that configures the pin controller
+automatically after reboot. SPI0 and this SPI-slave driver cannot own these
+pins at the same time.
+
+If you later want to use GPIO8-11 for SPI0 or another purpose, uninstall this
+driver and reboot:
+
+```bash
+sudo ./scripts/uninstall.sh
+sudo reboot
+```
+
+## Tested
+
+I have tested the driver at SPI clock speeds up to 1 MHz and completed a
+continuous 10 MB file transfer using application-level chunking and CRC
+checks. Version `0.1.0` remains experimental, so test it carefully in your own
+system.
+
+## More Information
+
+- [Installation and hardware wiring](docs/installation.md)
+- [Userspace ABI v0.1](docs/abi-v0.1.md)
+- [Python examples](docs/examples.md)
+- [Development and release checklist](docs/release-checklist.md)
+
+I hope this is what you were looking for. Let me know how it works in your
+setup. Thanks!
 
 ## License
 

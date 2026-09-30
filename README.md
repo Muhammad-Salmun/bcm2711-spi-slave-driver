@@ -57,6 +57,18 @@ The complete character-device contract is defined in the
 Dependency-free Python scripts for reading, publishing responses, and testing
 `poll()` are documented in the [examples guide](docs/examples.md).
 
+The simplest receiver is `examples/read.py`:
+
+```bash
+python3 examples/read.py
+```
+
+It opens `/dev/cm4_spi_slave` and repeatedly calls `read()` for up to 1024
+bytes. Each call waits until at least one byte is available, then returns with
+between 1 and 1024 currently queued bytes. The script prints the actual size
+and contents of every returned chunk. Change `CHUNK_SIZE` near the top of the
+script when a different maximum is needed. Stop it with `Ctrl-C`.
+
 ## Status
 
 Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry

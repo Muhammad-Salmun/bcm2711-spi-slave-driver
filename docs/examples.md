@@ -3,23 +3,16 @@
 The scripts in `examples/` use only the Python standard library and communicate
 with the installed driver through `/dev/cm4_spi_slave`.
 
-Read one chunk of received SPI payload data into a file:
+Continuously read received SPI payload data:
 
 ```bash
-python3 examples/read.py --count 4096 > received.bin
+python3 examples/read.py
 ```
 
-Try a read without waiting when no data is available:
-
-```bash
-python3 examples/read.py --nonblocking
-```
-
-Wait up to five seconds for received data:
-
-```bash
-python3 examples/read.py --timeout-ms 5000 > received.bin
-```
+The script requests up to 1024 bytes per blocking `read()`, prints the actual
+number of bytes returned, and waits for the next chunk. A returned chunk can be
+as small as one byte. Change the `CHUNK_SIZE` constant near the top of the
+script to use another maximum. Stop it with `Ctrl-C`.
 
 Publish a text response:
 
@@ -34,8 +27,7 @@ python3 examples/write.py --file response.bin
 ```
 
 The write example keeps its descriptor open so the response remains armed.
-Stop it with `Ctrl-C` after the master reads the response, or use a fixed hold
-time such as `--hold-ms 5000`.
+Stop it with `Ctrl-C` after the master reads the response.
 
 Wait for received data with `poll()`:
 

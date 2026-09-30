@@ -4,7 +4,6 @@
 import argparse
 import os
 import signal
-import time
 
 
 def parse_args():
@@ -13,20 +12,12 @@ def parse_args():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--text", help="UTF-8 text response")
     source.add_argument("--file", help="binary response file")
-    parser.add_argument(
-        "--hold-ms",
-        type=int,
-        default=-1,
-        help="keep response armed for this many ms; default waits for Ctrl-C",
-    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    if args.hold_ms < -1:
-        raise SystemExit("--hold-ms must be -1 or greater")
-
     if args.text is not None:
         data = args.text.encode("utf-8")
     else:
@@ -50,12 +41,8 @@ def main():
             raise SystemExit(f"short write: {written} of {len(data)} bytes")
 
         print(f"published {written} bytes to {args.device}")
-        if args.hold_ms < 0:
-            print("response armed; press Ctrl-C after the master reads it")
-            signal.pause()
-        elif args.hold_ms > 0:
-            print(f"keeping response armed for {args.hold_ms} ms")
-            time.sleep(args.hold_ms / 1000)
+        print("response armed; press Ctrl-C after the master reads it")
+        signal.pause()
     except KeyboardInterrupt:
         pass
     finally:

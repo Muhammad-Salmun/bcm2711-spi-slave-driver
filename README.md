@@ -54,6 +54,9 @@ response that has not finished transmitting.
 The complete character-device contract is defined in the
 [userspace ABI v0.1](docs/abi-v0.1.md).
 
+A small C utility for reading, publishing responses, and testing `poll()` is
+documented in the [test utility guide](docs/test-utility.md).
+
 ## Status
 
 Version `0.1.0` is experimental and supports BCM2711 only, including Raspberry

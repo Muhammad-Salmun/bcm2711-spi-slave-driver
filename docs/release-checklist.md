@@ -55,11 +55,11 @@ tests have passed on the release candidate.
 
 ## 5. Test utility
 
-- [ ] Add a small C utility that can open the character device.
-- [ ] Support blocking and nonblocking reads.
-- [ ] Support writes of binary and text data.
-- [ ] Demonstrate `poll()` for readable and writable events.
-- [ ] Report kernel errors clearly.
+- [x] Add a small C utility that can open the character device.
+- [x] Support blocking and nonblocking reads.
+- [x] Support writes of binary and text data.
+- [x] Demonstrate `poll()` for readable and writable events.
+- [x] Report kernel errors clearly.
 - [ ] Include repeatable loopback or master/slave test instructions.
 
 ## 6. Platform testing
